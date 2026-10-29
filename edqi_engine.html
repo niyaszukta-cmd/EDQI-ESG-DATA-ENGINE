@@ -1,0 +1,1412 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>EDQI Engine</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+
+<style>
+/* ═══════════════════════════════════════════
+   DESIGN TOKENS — dark-first financial terminal
+   ═══════════════════════════════════════════ */
+:root {
+  --bg:          #060F1E;
+  --bg-raised:   #0C1A2E;
+  --bg-card:     #0F2038;
+  --border:      #152840;
+  --border-mid:  #1E3A58;
+  --fg:          #E6EEF5;
+  --fg-muted:    #7B95AE;
+  --fg-faint:    #2E4A62;
+  --accent:      #0ECFA8;
+  --accent-hi:   #3DF7D0;
+  --gold:        #F5A124;
+  --pe:          #34D982;
+  --ps:          #4FA9FF;
+  --pg:          #AE82FF;
+  color-scheme: dark;
+  --ff-display:  'Fraunces', Georgia, serif;
+  --ff-body:     'IBM Plex Sans', system-ui, sans-serif;
+  --ff-mono:     'IBM Plex Mono', 'Courier New', monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg:          #EFF3F8;
+    --bg-raised:   #FFFFFF;
+    --bg-card:     #FFFFFF;
+    --border:      #D4E0EC;
+    --border-mid:  #B8CDD E;
+    --fg:          #0A1825;
+    --fg-muted:    #4A6478;
+    --fg-faint:    #B2C6D4;
+    --accent:      #007A62;
+    --accent-hi:   #005C49;
+    --gold:        #B07200;
+    --pe:          #0A7A3A;
+    --ps:          #1A5FBF;
+    --pg:          #6838C2;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg:          #EFF3F8;
+  --bg-raised:   #FFFFFF;
+  --bg-card:     #FFFFFF;
+  --border:      #D4E0EC;
+  --border-mid:  #B8CDDE;
+  --fg:          #0A1825;
+  --fg-muted:    #4A6478;
+  --fg-faint:    #B2C6D4;
+  --accent:      #007A62;
+  --accent-hi:   #005C49;
+  --gold:        #B07200;
+  --pe:          #0A7A3A;
+  --ps:          #1A5FBF;
+  --pg:          #6838C2;
+  color-scheme: light;
+}
+
+* { box-sizing: border-box; margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--ff-body);
+  font-size: 16px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+img { max-width: 100%; }
+
+/* ── gutter wrapper ── */
+.w {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
+}
+
+/* ═══════════════════════════════════════════
+   NAV
+   ═══════════════════════════════════════════ */
+.nav {
+  position: sticky;
+  top: env(safe-area-inset-top, 0px);
+  z-index: 200;
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 15px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
+}
+.nav-logo {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  text-decoration: none;
+}
+.logo-mark {
+  font-family: var(--ff-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--fg);
+  letter-spacing: -0.01em;
+}
+.logo-ver {
+  font-family: var(--ff-mono);
+  font-size: 0.62rem;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  padding: 1px 6px;
+  border-radius: 2px;
+  letter-spacing: 0.06em;
+}
+.nav-links {
+  display: flex;
+  gap: 30px;
+  align-items: center;
+  list-style: none;
+  padding: 0;
+}
+.nav-links a {
+  text-decoration: none;
+  color: var(--fg-muted);
+  font-size: 0.855rem;
+  font-weight: 500;
+  transition: color .15s;
+}
+.nav-links a:hover { color: var(--fg); }
+.nav-cta {
+  background: var(--accent) !important;
+  color: #060F1E !important;
+  padding: 7px 18px !important;
+  border-radius: 3px;
+  font-weight: 600 !important;
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════
+   HERO
+   ═══════════════════════════════════════════ */
+.hero {
+  position: relative;
+  overflow: hidden;
+}
+.hero-canvas {
+  position: absolute; inset: 0;
+  pointer-events: none;
+}
+.hero-glow {
+  position: absolute;
+  top: -30%; right: -5%;
+  width: 680px; height: 680px;
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--accent) 10%, transparent) 0%, transparent 65%);
+}
+.hero-body {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 440px;
+  gap: 64px;
+  align-items: center;
+  padding-block: 96px 80px;
+}
+.hero-eyebrow {
+  font-family: var(--ff-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--accent);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 22px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hero-eyebrow::before {
+  content: '';
+  display: block;
+  width: 28px; height: 1px;
+  background: var(--accent);
+}
+.hero-hl {
+  font-family: var(--ff-display);
+  font-size: clamp(2.5rem, 4.5vw, 3.8rem);
+  font-weight: 700;
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+  text-wrap: balance;
+  margin-bottom: 22px;
+  color: var(--fg);
+}
+.hero-hl em {
+  font-style: italic;
+  color: var(--accent);
+}
+.hero-sub {
+  color: var(--fg-muted);
+  font-size: 1.05rem;
+  line-height: 1.75;
+  max-width: 50ch;
+  margin-bottom: 40px;
+}
+.hero-acts {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.btn-p {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: var(--accent); color: #060F1E;
+  font-family: var(--ff-body); font-weight: 600; font-size: 0.9rem;
+  padding: 12px 24px; border: none; border-radius: 3px;
+  cursor: pointer; text-decoration: none; transition: filter .15s;
+}
+.btn-p:hover { filter: brightness(1.08); }
+.btn-o {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: transparent; color: var(--fg);
+  font-family: var(--ff-body); font-weight: 500; font-size: 0.9rem;
+  padding: 11px 22px; border: 1px solid var(--border-mid);
+  border-radius: 3px; cursor: pointer; text-decoration: none;
+  transition: border-color .15s;
+}
+.btn-o:hover { border-color: var(--fg-muted); }
+
+/* ── Score panel ── */
+.score-panel {
+  background: var(--bg-card);
+  border: 1px solid var(--border-mid);
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: var(--ff-mono);
+  flex-shrink: 0;
+}
+.sp-topbar {
+  height: 2px;
+  background: linear-gradient(90deg, var(--pe), var(--accent), var(--ps));
+}
+.sp-inner { padding: 26px; }
+.sp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+}
+.sp-hl {
+  font-size: 0.62rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.sp-live {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 0.6rem; color: var(--accent);
+}
+.live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 2s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.25} }
+.sp-company {
+  text-align: center;
+  font-size: 0.65rem; color: var(--fg-muted);
+  letter-spacing: 0.06em;
+  margin-bottom: 4px;
+}
+.sp-score-wrap {
+  text-align: center;
+  margin-bottom: 22px;
+}
+.sp-score {
+  font-family: var(--ff-display);
+  font-size: 4.8rem;
+  font-weight: 700;
+  color: var(--accent);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.sp-denom {
+  font-family: var(--ff-mono);
+  font-size: 1rem;
+  color: var(--fg-faint);
+}
+.sp-fy {
+  font-size: 0.65rem; color: var(--fg-muted); margin-top: 4px;
+}
+.sp-pillars {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.sp-pil {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 10px 8px;
+  text-align: center;
+}
+.sp-pil-name {
+  font-size: 0.58rem; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--fg-muted);
+  margin-bottom: 4px;
+}
+.sp-pil-val {
+  font-size: 1.45rem; font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.sp-pil:nth-child(1) .sp-pil-val { color: var(--pe); }
+.sp-pil:nth-child(2) .sp-pil-val { color: var(--ps); }
+.sp-pil:nth-child(3) .sp-pil-val { color: var(--pg); }
+.sp-cov-row {
+  display: flex; justify-content: space-between;
+  font-size: 0.62rem; color: var(--fg-muted);
+  margin-bottom: 5px;
+}
+.sp-cov-track {
+  height: 4px; background: var(--border);
+  border-radius: 2px; overflow: hidden;
+  margin-bottom: 18px;
+}
+.sp-cov-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--ps));
+  border-radius: 2px;
+  width: 0%; transition: width 1.6s cubic-bezier(.22,1,.36,1);
+}
+.sp-trend-label {
+  font-size: 0.58rem; color: var(--fg-faint);
+  letter-spacing: 0.08em; text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.sp-bars {
+  display: flex;
+  gap: 5px;
+  height: 52px;
+  align-items: flex-end;
+}
+.sp-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  height: 100%;
+}
+.sp-bar {
+  flex: 1;
+  background: var(--border);
+  border-radius: 2px 2px 0 0;
+  position: relative;
+  overflow: hidden;
+}
+.sp-bar-fill {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: var(--accent);
+  border-radius: 2px 2px 0 0;
+  height: 0%;
+  transition: height 1.4s cubic-bezier(.22,1,.36,1);
+}
+.sp-bar.cur .sp-bar-fill { background: var(--accent-hi); }
+.sp-bar-yr {
+  font-size: 0.52rem; color: var(--fg-faint);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ═══════════════════════════════════════════
+   STATS STRIP
+   ═══════════════════════════════════════════ */
+.stats {
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-raised);
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+.stat {
+  padding: 28px 32px;
+  border-right: 1px solid var(--border);
+}
+.stat:last-child { border-right: none; }
+.stat-n {
+  font-family: var(--ff-display);
+  font-size: 2.8rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+}
+.stat-n sup {
+  font-family: var(--ff-mono);
+  font-size: 0.8rem;
+  color: var(--accent);
+  vertical-align: super;
+  margin-left: 2px;
+}
+.stat-l {
+  font-size: 0.8rem;
+  color: var(--fg-muted);
+  margin-top: 5px;
+}
+
+/* ═══════════════════════════════════════════
+   SHARED SECTION CHROME
+   ═══════════════════════════════════════════ */
+.section { padding-block: 88px; }
+.section-alt { background: var(--bg-raised); }
+.eyebrow {
+  font-family: var(--ff-mono);
+  font-size: 0.68rem;
+  font-weight: 500;
+  color: var(--accent);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 14px;
+  display: flex; align-items: center; gap: 10px;
+}
+.eyebrow::before {
+  content: '';
+  display: block;
+  width: 22px; height: 1px;
+  background: var(--accent);
+}
+.sec-hl {
+  font-family: var(--ff-display);
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+  color: var(--fg);
+  margin-bottom: 14px;
+}
+.sec-body {
+  color: var(--fg-muted);
+  font-size: 1rem;
+  line-height: 1.75;
+  max-width: 56ch;
+}
+
+/* ═══════════════════════════════════════════
+   METHODOLOGY
+   ═══════════════════════════════════════════ */
+.method-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 64px;
+  align-items: start;
+  margin-top: 56px;
+}
+.method-step {
+  display: flex;
+  gap: 22px;
+  padding-block: 26px;
+  border-top: 1px solid var(--border);
+}
+.method-step:first-child { border-top: none; }
+.step-n {
+  font-family: var(--ff-mono);
+  font-size: 0.68rem;
+  color: var(--accent);
+  padding-top: 2px;
+  min-width: 26px;
+}
+.step-t {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--fg);
+  margin-bottom: 6px;
+}
+.step-d {
+  font-size: 0.875rem;
+  color: var(--fg-muted);
+  line-height: 1.65;
+}
+.formula-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  overflow: hidden;
+  position: sticky;
+  top: 72px;
+}
+.fbox-header {
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+  font-family: var(--ff-mono);
+  font-size: 0.62rem;
+  color: var(--fg-muted);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.fbox-lines { padding: 6px 0; }
+.fline {
+  display: flex;
+  align-items: baseline;
+  gap: 0;
+  padding: 9px 20px;
+  border-bottom: 1px solid var(--border);
+}
+.fline:last-child { border-bottom: none; }
+.fsym {
+  font-family: var(--ff-mono);
+  font-size: 0.72rem;
+  color: var(--accent);
+  min-width: 112px;
+  flex-shrink: 0;
+}
+.feq {
+  font-family: var(--ff-mono);
+  font-size: 0.7rem;
+  color: var(--fg-muted);
+  line-height: 1.5;
+  min-width: 0;
+}
+
+/* ═══════════════════════════════════════════
+   INDICATORS
+   ═══════════════════════════════════════════ */
+.era-tabs {
+  display: inline-flex;
+  gap: 0;
+  border: 1px solid var(--border-mid);
+  border-radius: 4px;
+  padding: 3px;
+  background: var(--bg-raised);
+  margin-bottom: 32px;
+}
+.era-tab {
+  padding: 8px 22px;
+  border-radius: 2px;
+  font-family: var(--ff-mono);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--fg-muted);
+  transition: all .15s;
+  white-space: nowrap;
+}
+.era-tab.on {
+  background: var(--accent);
+  color: #060F1E;
+}
+.era-panel { display: none; }
+.era-panel.on { display: block; }
+.era-head {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding-bottom: 18px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+}
+.era-name {
+  font-family: var(--ff-display);
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--fg);
+}
+.era-meta {
+  font-family: var(--ff-mono);
+  font-size: 0.7rem;
+  color: var(--fg-muted);
+}
+.era-counts {
+  margin-left: auto;
+  display: flex;
+  gap: 10px;
+}
+.pillar-chip {
+  font-family: var(--ff-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 2px;
+}
+.chip-e { background: color-mix(in srgb,var(--pe) 14%,transparent); color: var(--pe); }
+.chip-s { background: color-mix(in srgb,var(--ps) 14%,transparent); color: var(--ps); }
+.chip-g { background: color-mix(in srgb,var(--pg) 14%,transparent); color: var(--pg); }
+.ind-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.ind-c {
+  background: var(--bg-raised);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 14px 15px;
+  transition: border-color .15s;
+  cursor: default;
+}
+.ind-c:hover { border-color: var(--border-mid); }
+.ind-id {
+  font-family: var(--ff-mono);
+  font-size: 0.62rem;
+  color: var(--accent);
+  margin-bottom: 5px;
+}
+.ind-nm {
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--fg);
+  line-height: 1.3;
+  margin-bottom: 7px;
+}
+.ind-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.ind-unit {
+  font-family: var(--ff-mono);
+  font-size: 0.58rem;
+  color: var(--fg-faint);
+}
+.ind-inv {
+  font-family: var(--ff-mono);
+  font-size: 0.54rem;
+  color: var(--gold);
+  border: 1px solid color-mix(in srgb,var(--gold) 50%,transparent);
+  padding: 0 4px;
+  border-radius: 2px;
+}
+
+/* ═══════════════════════════════════════════
+   TECHNOLOGY
+   ═══════════════════════════════════════════ */
+.tech-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-top: 52px;
+}
+.tech-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 30px;
+}
+.tech-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 18px;
+}
+.tech-logo-box {
+  width: 46px; height: 46px;
+  background: var(--bg-raised);
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--ff-mono);
+  font-size: 0.62rem;
+  font-weight: 500;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
+.tech-tag {
+  font-family: var(--ff-mono);
+  font-size: 0.6rem;
+  font-weight: 500;
+  padding: 3px 9px;
+  border-radius: 2px;
+  letter-spacing: 0.04em;
+}
+.tag-free { background: color-mix(in srgb,var(--accent) 14%,transparent); color: var(--accent); }
+.tag-ind  { background: color-mix(in srgb,var(--gold) 14%,transparent);   color: var(--gold); }
+.tech-name {
+  font-weight: 600;
+  font-size: 1.05rem;
+  color: var(--fg);
+  margin-bottom: 10px;
+}
+.tech-desc {
+  font-size: 0.875rem;
+  color: var(--fg-muted);
+  line-height: 1.65;
+  margin-bottom: 18px;
+}
+.tech-specs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+}
+.spec-row {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--ff-mono);
+  font-size: 0.68rem;
+}
+.spec-k { color: var(--fg-faint); }
+.spec-v { color: var(--fg-muted); }
+
+/* ═══════════════════════════════════════════
+   OUTPUT / PANEL DATA PREVIEW
+   ═══════════════════════════════════════════ */
+.panel-preview {
+  background: var(--bg-card);
+  border: 1px solid var(--border-mid);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 52px;
+}
+.pp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--border);
+}
+.pp-title {
+  font-family: var(--ff-mono);
+  font-size: 0.65rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.pp-badges { display: flex; gap: 8px; }
+.pp-badge {
+  font-family: var(--ff-mono);
+  font-size: 0.58rem;
+  border: 1px solid var(--border-mid);
+  padding: 2px 7px;
+  border-radius: 2px;
+  color: var(--fg-muted);
+}
+.pp-scroll { overflow-x: auto; }
+.dtable {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--ff-mono);
+  font-size: 0.72rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 600px;
+}
+.dtable th {
+  text-align: right;
+  color: var(--fg-faint);
+  font-weight: 400;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+.dtable th:first-child { text-align: left; }
+.dtable td {
+  text-align: right;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+.dtable td:first-child {
+  text-align: left;
+  color: var(--fg);
+  font-weight: 500;
+}
+.dtable tr:last-child td { border-bottom: none; }
+.cv-hi { color: var(--pe) !important; }
+.cv-md { color: var(--gold) !important; }
+.cv-lo { color: var(--fg-faint) !important; }
+
+/* ═══════════════════════════════════════════
+   CTA
+   ═══════════════════════════════════════════ */
+.cta-band {
+  border-top: 1px solid var(--border);
+  padding-block: 80px;
+}
+.cta-inner {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 48px;
+  align-items: center;
+}
+.cta-hl {
+  font-family: var(--ff-display);
+  font-size: clamp(1.7rem, 3.2vw, 2.6rem);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.022em;
+  text-wrap: balance;
+  color: var(--fg);
+  margin-bottom: 12px;
+}
+.cta-sub {
+  color: var(--fg-muted);
+  font-size: 0.95rem;
+  max-width: 52ch;
+}
+.cta-acts {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 190px;
+}
+
+/* ═══════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════ */
+footer {
+  border-top: 1px solid var(--border);
+  padding-block: 26px;
+}
+.foot-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-left: max(24px, env(safe-area-inset-left, 0px));
+  padding-right: max(24px, env(safe-area-inset-right, 0px));
+}
+.foot-brand {
+  font-family: var(--ff-display);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--fg-muted);
+}
+.foot-stack {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.foot-tag {
+  font-family: var(--ff-mono);
+  font-size: 0.62rem;
+  color: var(--fg-faint);
+}
+
+/* ═══════════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════════ */
+@media (prefers-reduced-motion: no-preference) {
+  .fade { opacity: 0; transform: translateY(18px); transition: opacity .5s ease, transform .5s ease; }
+  .fade.in { opacity: 1; transform: none; }
+}
+
+/* ═══════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .hero-body { grid-template-columns: 1fr; }
+  .score-panel { display: none; }
+  .method-layout { grid-template-columns: 1fr; }
+  .formula-box { position: static; }
+  .tech-grid { grid-template-columns: 1fr; }
+  .cta-inner { grid-template-columns: 1fr; }
+  .cta-acts { flex-direction: row; flex-wrap: wrap; }
+}
+@media (max-width: 760px) {
+  .stats-grid { grid-template-columns: 1fr 1fr; }
+  .stat { border-right: none; }
+  .stat:nth-child(odd) { border-right: 1px solid var(--border); }
+  .ind-grid { grid-template-columns: repeat(2, 1fr); }
+  .nav-links { display: none; }
+}
+@media (max-width: 500px) {
+  .ind-grid { grid-template-columns: 1fr; }
+  .era-head { flex-direction: column; gap: 8px; }
+  .era-counts { margin-left: 0; }
+}
+</style>
+
+<!-- ════════════════ NAV ════════════════ -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="nav-logo" href="#">
+      <span class="logo-mark">EDQI Engine</span>
+      <span class="logo-ver">v2.0</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#methodology">Methodology</a></li>
+      <li><a href="#indicators">Indicators</a></li>
+      <li><a href="#technology">Technology</a></li>
+      <li><a href="#output">Output</a></li>
+      <li><a href="#get-started" class="nav-cta">Get Started</a></li>
+    </ul>
+  </div>
+</nav>
+
+<!-- ════════════════ HERO ════════════════ -->
+<section class="hero">
+  <div class="hero-canvas">
+    <canvas id="dotCanvas"></canvas>
+    <div class="hero-glow"></div>
+  </div>
+  <div class="w">
+    <div class="hero-body">
+      <div>
+        <p class="hero-eyebrow">ESG Disclosure Quality Index</p>
+        <h1 class="hero-hl">Quantify ESG disclosure quality across <em>Indian corporate reporting</em></h1>
+        <p class="hero-sub">Upload BRR and BRSR annual reports. The engine extracts 57 indicators across two regulatory eras, scores each year against its era peers, and delivers a panel-format EDQI dataset — ready for research, compliance benchmarking, or investor analysis.</p>
+        <div class="hero-acts">
+          <a href="#get-started" class="btn-p">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7h10M7 2l5 5-5 5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Get the App
+          </a>
+          <a href="#methodology" class="btn-o">View Methodology</a>
+        </div>
+      </div>
+
+      <!-- Live score panel -->
+      <div class="score-panel">
+        <div class="sp-topbar"></div>
+        <div class="sp-inner">
+          <div class="sp-header">
+            <span class="sp-hl">EDQI Live Preview</span>
+            <span class="sp-live"><span class="live-dot"></span>Scoring</span>
+          </div>
+          <p class="sp-company">SAMPLE COMPANY · NIFTY 500</p>
+          <div class="sp-score-wrap">
+            <div>
+              <span class="sp-score" id="scoreNum">0</span><span class="sp-denom"> /100</span>
+            </div>
+            <p class="sp-fy">FY 2024 · ERA 2 (BRSR)</p>
+          </div>
+          <div class="sp-pillars">
+            <div class="sp-pil">
+              <div class="sp-pil-name">Environmental</div>
+              <div class="sp-pil-val" id="eScore">—</div>
+            </div>
+            <div class="sp-pil">
+              <div class="sp-pil-name">Social</div>
+              <div class="sp-pil-val" id="sScore">—</div>
+            </div>
+            <div class="sp-pil">
+              <div class="sp-pil-name">Governance</div>
+              <div class="sp-pil-val" id="gScore">—</div>
+            </div>
+          </div>
+          <div class="sp-cov-row">
+            <span>Indicator Coverage</span>
+            <span id="covPct">0%</span>
+          </div>
+          <div class="sp-cov-track">
+            <div class="sp-cov-fill" id="covBar"></div>
+          </div>
+          <div class="sp-trend-label">10-Year ESG Trend</div>
+          <div class="sp-bars" id="trendBars"></div>
+          <div class="sp-bars" id="trendYrs" style="height:auto;margin-top:4px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ STATS ════════════════ -->
+<div class="stats">
+  <div class="stats-grid w">
+    <div class="stat fade">
+      <div class="stat-n">57<sup>KPIs</sup></div>
+      <div class="stat-l">BRR + BRSR indicators across two regulatory frameworks</div>
+    </div>
+    <div class="stat fade">
+      <div class="stat-n">14<sup>yrs</sup></div>
+      <div class="stat-l">Panel coverage FY 2012 through FY 2025</div>
+    </div>
+    <div class="stat fade">
+      <div class="stat-n">2<sup>eras</sup></div>
+      <div class="stat-l">ERA 1 BRR scored separately from ERA 2 BRSR</div>
+    </div>
+    <div class="stat fade">
+      <div class="stat-n">3<sup>pillars</sup></div>
+      <div class="stat-l">Environmental · Social · Governance composite index</div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════ METHODOLOGY ════════════════ -->
+<section class="section" id="methodology">
+  <div class="w">
+    <p class="eyebrow">Scoring Methodology</p>
+    <h2 class="sec-hl">Era-aware z-normalised scoring</h2>
+    <p class="sec-body">BRR and BRSR are structurally different regulatory frameworks. Scoring ERA 1 years against ERA 2 peers would confound the index. EDQI scores each era independently, then merges the result into a unified panel.</p>
+
+    <div class="method-layout">
+      <div>
+        <div class="method-step fade">
+          <span class="step-n">01</span>
+          <div>
+            <div class="step-t">PDF text extraction</div>
+            <div class="step-d">Each annual report PDF is parsed with pdfplumber. A keyword-density sliding window (9,000 chars) identifies the ESG-dense section — the segment most likely to contain BRR or BRSR disclosures — and passes it to the LLM.</div>
+          </div>
+        </div>
+        <div class="method-step fade">
+          <span class="step-n">02</span>
+          <div>
+            <div class="step-t">LLM extraction via structured prompt</div>
+            <div class="step-d">A structured prompt tuned to the fiscal year's regulatory era asks the model for exactly 25 (ERA 1) or 32 (ERA 2) numeric KPIs in JSON. Non-disclosed indicators return null.</div>
+          </div>
+        </div>
+        <div class="method-step fade">
+          <span class="step-n">03</span>
+          <div>
+            <div class="step-t">Within-era z-normalisation</div>
+            <div class="step-d">Each indicator is z-normalised across all years within the same era, then min-max scaled to [0, 100]. Lower-is-better indicators (emissions, incidents, fines) are inverted so 100 always means best practice.</div>
+          </div>
+        </div>
+        <div class="method-step fade">
+          <span class="step-n">04</span>
+          <div>
+            <div class="step-t">Pillar aggregation and composite</div>
+            <div class="step-d">E, S, and G pillar scores are the unweighted mean of their member indicator scores. The EDQI composite is (E + S + G) / 3. Coverage % tracks how many indicators were successfully extracted.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="formula-box fade">
+        <div class="fbox-header">EDQI Formula</div>
+        <div class="fbox-lines">
+          <div class="fline">
+            <span class="fsym">z_i</span>
+            <span class="feq">= (raw_i − μ_era) / σ_era</span>
+          </div>
+          <div class="fline">
+            <span class="fsym">s_i</span>
+            <span class="feq">= minmax(z_i) × 100<br>if inv: s_i = 100 − s_i</span>
+          </div>
+          <div class="fline">
+            <span class="fsym">E_score</span>
+            <span class="feq">= mean(s_i) for E indicators</span>
+          </div>
+          <div class="fline">
+            <span class="fsym">S_score</span>
+            <span class="feq">= mean(s_i) for S indicators</span>
+          </div>
+          <div class="fline">
+            <span class="fsym">G_score</span>
+            <span class="feq">= mean(s_i) for G indicators</span>
+          </div>
+          <div class="fline">
+            <span class="fsym">EDQI</span>
+            <span class="feq">= (E + S + G) / 3</span>
+          </div>
+          <div class="fline">
+            <span class="fsym">Scope</span>
+            <span class="feq">ERA 1 ↔ ERA 2 scored<br>independently</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ INDICATORS ════════════════ -->
+<section class="section section-alt" id="indicators">
+  <div class="w">
+    <p class="eyebrow">Indicator System</p>
+    <h2 class="sec-hl">57 KPIs across two regulatory eras</h2>
+    <p class="sec-body">ERA 1 covers the Business Responsibility Report framework (FY 2012–2021). ERA 2 covers the Business Responsibility and Sustainability Report (FY 2022 onwards), which expanded the indicator set significantly.</p>
+
+    <div style="margin-top:40px;">
+      <div class="era-tabs">
+        <button class="era-tab on" onclick="switchEra('era1',this)">ERA 1 · BRR (25 KPIs)</button>
+        <button class="era-tab"   onclick="switchEra('era2',this)">ERA 2 · BRSR (32 KPIs)</button>
+      </div>
+
+      <div class="era-panel on" id="era1">
+        <div class="era-head">
+          <span class="era-name">Business Responsibility Report</span>
+          <span class="era-meta">FY 2012 – 2021</span>
+          <div class="era-counts">
+            <span class="pillar-chip chip-e">E · 9</span>
+            <span class="pillar-chip chip-s">S · 10</span>
+            <span class="pillar-chip chip-g">G · 6</span>
+          </div>
+        </div>
+        <div class="ind-grid" id="era1-grid"></div>
+      </div>
+
+      <div class="era-panel" id="era2">
+        <div class="era-head">
+          <span class="era-name">Business Responsibility and Sustainability Report</span>
+          <span class="era-meta">FY 2022 onwards</span>
+          <div class="era-counts">
+            <span class="pillar-chip chip-e">E · 13</span>
+            <span class="pillar-chip chip-s">S · 14</span>
+            <span class="pillar-chip chip-g">G · 5</span>
+          </div>
+        </div>
+        <div class="ind-grid" id="era2-grid"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ TECHNOLOGY ════════════════ -->
+<section class="section" id="technology">
+  <div class="w">
+    <p class="eyebrow">AI Providers</p>
+    <h2 class="sec-hl">Two LLM backends, one engine</h2>
+    <p class="sec-body">Switch between Groq and Sarvam AI from the Configure screen. Both use the same structured extraction prompts — no code changes needed.</p>
+
+    <div class="tech-grid">
+      <div class="tech-card fade">
+        <div class="tech-card-top">
+          <div class="tech-logo-box">GROQ</div>
+          <span class="tech-tag tag-free">Free Tier</span>
+        </div>
+        <div class="tech-name">Groq API</div>
+        <div class="tech-desc">Ultra-fast LPU inference with a generous free tier — the recommended starting point for most users. Get an API key at console.groq.com in under two minutes.</div>
+        <div class="tech-specs">
+          <div class="spec-row"><span class="spec-k">Endpoint</span><span class="spec-v">api.groq.com/openai/v1</span></div>
+          <div class="spec-row"><span class="spec-k">Auth</span><span class="spec-v">Bearer token</span></div>
+          <div class="spec-row"><span class="spec-k">Default model</span><span class="spec-v">llama-3.3-70b-versatile</span></div>
+          <div class="spec-row"><span class="spec-k">Alt models</span><span class="spec-v">Mixtral · Gemma2</span></div>
+        </div>
+      </div>
+      <div class="tech-card fade">
+        <div class="tech-card-top">
+          <div class="tech-logo-box">SRVAM</div>
+          <span class="tech-tag tag-ind">Made in India</span>
+        </div>
+        <div class="tech-name">Sarvam AI</div>
+        <div class="tech-desc">India-built language model optimised for Indian business and regulatory language. A natural fit for BRR and BRSR documents. API keys at api.sarvam.ai.</div>
+        <div class="tech-specs">
+          <div class="spec-row"><span class="spec-k">Endpoint</span><span class="spec-v">api.sarvam.ai/v1</span></div>
+          <div class="spec-row"><span class="spec-k">Auth</span><span class="spec-v">api-subscription-key header</span></div>
+          <div class="spec-row"><span class="spec-k">Default model</span><span class="spec-v">sarvam-m</span></div>
+          <div class="spec-row"><span class="spec-k">Context</span><span class="spec-v">Indian regulatory corpus</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ OUTPUT ════════════════ -->
+<section class="section section-alt" id="output">
+  <div class="w">
+    <p class="eyebrow">Panel Data Output</p>
+    <h2 class="sec-hl">One row per fiscal year, ready for analysis</h2>
+    <p class="sec-body">The Results page shows EDQI scores and indicator coverage by year. Export to CSV, Excel (4 sheets: Scores · BRR indicators · BRSR indicators · Metadata), or raw JSON for further processing.</p>
+
+    <div class="panel-preview">
+      <div class="pp-header">
+        <span class="pp-title">EDQI Scores — Sample Output</span>
+        <div class="pp-badges">
+          <span class="pp-badge">CSV</span>
+          <span class="pp-badge">Excel · 4 sheets</span>
+          <span class="pp-badge">JSON</span>
+        </div>
+      </div>
+      <div class="pp-scroll">
+        <table class="dtable">
+          <thead>
+            <tr>
+              <th>Fiscal Year</th>
+              <th>Era</th>
+              <th>E Score</th>
+              <th>S Score</th>
+              <th>G Score</th>
+              <th>EDQI</th>
+              <th>Coverage</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>FY 2018</td><td>ERA 1</td><td class="cv-lo">44.2</td><td class="cv-lo">51.8</td><td class="cv-lo">38.6</td><td class="cv-lo">44.9</td><td>68%</td></tr>
+            <tr><td>FY 2019</td><td>ERA 1</td><td class="cv-md">58.1</td><td class="cv-md">63.4</td><td class="cv-md">55.0</td><td class="cv-md">58.8</td><td>72%</td></tr>
+            <tr><td>FY 2020</td><td>ERA 1</td><td class="cv-md">67.3</td><td class="cv-md">61.2</td><td class="cv-md">70.1</td><td class="cv-md">66.2</td><td>76%</td></tr>
+            <tr><td>FY 2021</td><td>ERA 1</td><td class="cv-hi">74.8</td><td class="cv-hi">79.3</td><td class="cv-hi">72.5</td><td class="cv-hi">75.5</td><td>84%</td></tr>
+            <tr><td>FY 2022</td><td>ERA 2</td><td class="cv-md">61.4</td><td class="cv-md">58.9</td><td class="cv-md">64.2</td><td class="cv-md">61.5</td><td>72%</td></tr>
+            <tr><td>FY 2023</td><td>ERA 2</td><td class="cv-md">70.2</td><td class="cv-hi">76.5</td><td class="cv-md">69.8</td><td class="cv-md">72.2</td><td>81%</td></tr>
+            <tr><td>FY 2024</td><td>ERA 2</td><td class="cv-hi">78.6</td><td class="cv-hi">82.3</td><td class="cv-hi">80.4</td><td class="cv-hi">80.4</td><td>88%</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ CTA ════════════════ -->
+<section class="cta-band" id="get-started">
+  <div class="w cta-inner">
+    <div>
+      <h2 class="cta-hl">Run EDQI on your company's annual reports</h2>
+      <p class="cta-sub">A two-file Streamlit app — app.py + requirements.txt. Add your Groq or Sarvam AI key, upload up to 10 PDFs, and download the scored panel dataset.</p>
+    </div>
+    <div class="cta-acts">
+      <a href="#" class="btn-p">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M6.5 1v8M3 6l3.5 3.5L10 6M1 12h11" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Download App
+      </a>
+      <a href="#methodology" class="btn-o">Read the Docs</a>
+    </div>
+  </div>
+</section>
+
+<!-- ════════════════ FOOTER ════════════════ -->
+<footer>
+  <div class="foot-inner">
+    <span class="foot-brand">Zodha Research Solutions</span>
+    <div class="foot-stack">
+      <span class="foot-tag">Streamlit</span>
+      <span class="foot-tag">pdfplumber</span>
+      <span class="foot-tag">Groq LPU</span>
+      <span class="foot-tag">Sarvam AI</span>
+      <span class="foot-tag">BRR / BRSR</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+/* ─── Indicator data ─── */
+const ERA1 = [
+  {id:"E1", p:"E", name:"GHG Scope 1+2", unit:"tCO2e", inv:true},
+  {id:"E2", p:"E", name:"GHG Intensity", unit:"tCO2e/Rcr", inv:true},
+  {id:"E3", p:"E", name:"Energy Consumption", unit:"GJ or kWh", inv:true},
+  {id:"E4", p:"E", name:"Energy Intensity", unit:"GJ/Rcr", inv:true},
+  {id:"E5", p:"E", name:"Renewable Energy", unit:"%", inv:false},
+  {id:"E6", p:"E", name:"Water Withdrawal", unit:"kL/yr", inv:true},
+  {id:"E7", p:"E", name:"Water Intensity", unit:"kL/Rcr", inv:true},
+  {id:"E8", p:"E", name:"Waste Generated", unit:"MT/yr", inv:true},
+  {id:"E9", p:"E", name:"Waste Recycled", unit:"%", inv:false},
+  {id:"S1", p:"S", name:"Permanent Employees", unit:"count", inv:false},
+  {id:"S2", p:"S", name:"Women Employees", unit:"%", inv:false},
+  {id:"S3", p:"S", name:"Training Hours/Employee", unit:"hrs/yr", inv:false},
+  {id:"S4", p:"S", name:"Training Spend", unit:"Rs cr", inv:false},
+  {id:"S5", p:"S", name:"CSR Expenditure", unit:"Rs cr", inv:false},
+  {id:"S6", p:"S", name:"CSR as % of PAT", unit:"%", inv:false},
+  {id:"S7", p:"S", name:"Safety Incidents", unit:"count", inv:true},
+  {id:"S8", p:"S", name:"LTIFR", unit:"per Mmhr", inv:true},
+  {id:"S9", p:"S", name:"Employee Grievances", unit:"count", inv:true},
+  {id:"S10",p:"S", name:"Customer Complaints", unit:"count", inv:true},
+  {id:"G1", p:"G", name:"Board Meetings", unit:"count/yr", inv:false},
+  {id:"G2", p:"G", name:"Independent Directors", unit:"%", inv:false},
+  {id:"G3", p:"G", name:"Women on Board", unit:"%", inv:false},
+  {id:"G4", p:"G", name:"Audit Committee Meetings", unit:"count/yr", inv:false},
+  {id:"G5", p:"G", name:"Director Attendance", unit:"%", inv:false},
+  {id:"G6", p:"G", name:"CSR Committee Meetings", unit:"count/yr", inv:false},
+];
+
+const ERA2 = [
+  {id:"BE1", p:"E", name:"GHG Scope 1", unit:"tCO2e", inv:true},
+  {id:"BE2", p:"E", name:"GHG Scope 2", unit:"tCO2e", inv:true},
+  {id:"BE3", p:"E", name:"GHG Intensity", unit:"tCO2e/Rcr", inv:true},
+  {id:"BE4", p:"E", name:"Energy Consumption", unit:"GJ", inv:true},
+  {id:"BE5", p:"E", name:"Renewable Energy", unit:"%", inv:false},
+  {id:"BE6", p:"E", name:"Energy Intensity", unit:"GJ/Rcr", inv:true},
+  {id:"BE7", p:"E", name:"Water Withdrawal", unit:"kL", inv:true},
+  {id:"BE8", p:"E", name:"Water Intensity", unit:"kL/Rcr", inv:true},
+  {id:"BE9", p:"E", name:"Water Recycled", unit:"%", inv:false},
+  {id:"BE10",p:"E", name:"Waste Generated", unit:"MT", inv:true},
+  {id:"BE11",p:"E", name:"Hazardous Waste %", unit:"%", inv:true},
+  {id:"BE12",p:"E", name:"Waste Recycled %", unit:"%", inv:false},
+  {id:"BE13",p:"E", name:"Env Fines Paid", unit:"Rs", inv:true},
+  {id:"BS1", p:"S", name:"Permanent Employees", unit:"count", inv:false},
+  {id:"BS2", p:"S", name:"Women Workforce", unit:"%", inv:false},
+  {id:"BS3", p:"S", name:"Health Insurance Coverage", unit:"%", inv:false},
+  {id:"BS4", p:"S", name:"PF / Retirement Benefit", unit:"%", inv:false},
+  {id:"BS5", p:"S", name:"Return-to-Work Rate", unit:"%", inv:false},
+  {id:"BS6", p:"S", name:"Training Hours/Employee", unit:"hrs/yr", inv:false},
+  {id:"BS7", p:"S", name:"H&S Training %", unit:"%", inv:false},
+  {id:"BS8", p:"S", name:"Fatalities", unit:"count", inv:true},
+  {id:"BS9", p:"S", name:"LTIFR", unit:"per Mmhr", inv:true},
+  {id:"BS10",p:"S", name:"POSH Complaints", unit:"count", inv:true},
+  {id:"BS11",p:"S", name:"CSR Expenditure", unit:"Rs cr", inv:false},
+  {id:"BS12",p:"S", name:"CSR as % of PAT", unit:"%", inv:false},
+  {id:"BS13",p:"S", name:"Consumer Complaints", unit:"count", inv:true},
+  {id:"BS14",p:"S", name:"Complaint Resolution Rate", unit:"%", inv:false},
+  {id:"BG1", p:"G", name:"Independent Directors", unit:"%", inv:false},
+  {id:"BG2", p:"G", name:"Women Directors", unit:"%", inv:false},
+  {id:"BG3", p:"G", name:"Governance Complaints Resolved", unit:"%", inv:false},
+  {id:"BG4", p:"G", name:"Ethics Complaints Filed", unit:"count", inv:true},
+  {id:"BG5", p:"G", name:"BRSR Principles Coverage", unit:"%", inv:false},
+];
+
+function indCard(d) {
+  const cls = {E:'chip-e',S:'chip-s',G:'chip-g'}[d.p];
+  return `<div class="ind-c">
+    <div class="ind-id"><span class="pillar-chip ${cls}">${d.p}</span> ${d.id}</div>
+    <div class="ind-nm">${d.name}</div>
+    <div class="ind-foot">
+      <span class="ind-unit">${d.unit}</span>
+      ${d.inv ? '<span class="ind-inv">↓ lower=better</span>' : ''}
+    </div>
+  </div>`;
+}
+
+document.getElementById('era1-grid').innerHTML = ERA1.map(indCard).join('');
+document.getElementById('era2-grid').innerHTML = ERA2.map(indCard).join('');
+
+function switchEra(id, btn) {
+  document.querySelectorAll('.era-tab').forEach(t => t.classList.remove('on'));
+  document.querySelectorAll('.era-panel').forEach(p => p.classList.remove('on'));
+  btn.classList.add('on');
+  document.getElementById(id).classList.add('on');
+}
+
+/* ─── Score panel animation ─── */
+const trendData = [
+  {yr:'FY15', v:28}, {yr:'FY16', v:34}, {yr:'FY17', v:40},
+  {yr:'FY18', v:45}, {yr:'FY19', v:59}, {yr:'FY20', v:66},
+  {yr:'FY21', v:76}, {yr:'FY22', v:62}, {yr:'FY23', v:72}, {yr:'FY24', v:80}
+];
+
+const barsEl = document.getElementById('trendBars');
+const yrsEl  = document.getElementById('trendYrs');
+yrsEl.style.cssText = 'display:flex;gap:5px;margin-top:4px;';
+
+trendData.forEach((d, i) => {
+  const wrap = document.createElement('div');
+  wrap.className = 'sp-bar-wrap';
+  const bar = document.createElement('div');
+  bar.className = 'sp-bar' + (i === trendData.length-1 ? ' cur' : '');
+  const fill = document.createElement('div');
+  fill.className = 'sp-bar-fill';
+  fill.id = `bar${i}`;
+  bar.appendChild(fill);
+  wrap.appendChild(bar);
+  barsEl.appendChild(wrap);
+
+  const yr = document.createElement('div');
+  yr.className = 'sp-bar-yr';
+  yr.textContent = d.yr;
+  yrsEl.appendChild(yr);
+});
+
+function countTo(el, target, dur, decimals=1) {
+  const start = performance.now();
+  function tick(now) {
+    const t = Math.min((now - start) / dur, 1);
+    const ease = t < .5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
+    el.textContent = (target * ease).toFixed(decimals);
+    if (t < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+setTimeout(() => {
+  countTo(document.getElementById('scoreNum'), 80.4, 1600);
+  setTimeout(() => { document.getElementById('eScore').textContent = '78.6'; }, 900);
+  setTimeout(() => { document.getElementById('sScore').textContent = '82.3'; }, 1100);
+  setTimeout(() => { document.getElementById('gScore').textContent = '80.4'; }, 1300);
+  document.getElementById('covBar').style.width = '88%';
+  document.getElementById('covPct').textContent = '88%';
+  trendData.forEach((d, i) => {
+    setTimeout(() => {
+      const fill = document.getElementById('bar'+i);
+      if (fill) fill.style.height = d.v + '%';
+    }, i * 80 + 400);
+  });
+}, 600);
+
+/* ─── Dot grid canvas ─── */
+(function() {
+  const canvas = document.getElementById('dotCanvas');
+  const hero = canvas.parentElement.parentElement;
+  function resize() {
+    canvas.width = hero.offsetWidth;
+    canvas.height = hero.offsetHeight;
+    draw();
+  }
+  function draw() {
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const gap = 40;
+    const isDark = !document.documentElement.dataset.theme || document.documentElement.dataset.theme === 'dark'
+                   || (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light');
+    ctx.fillStyle = isDark ? 'rgba(14,207,168,0.09)' : 'rgba(0,122,98,0.09)';
+    for (let x = 0; x < canvas.width; x += gap) {
+      for (let y = 0; y < canvas.height; y += gap) {
+        ctx.beginPath();
+        ctx.arc(x, y, 1.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+  }
+  window.addEventListener('resize', resize);
+  resize();
+})();
+
+/* ─── Fade-in on scroll ─── */
+if (window.IntersectionObserver) {
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); obs.unobserve(e.target); } });
+  }, { threshold: 0.12 });
+  document.querySelectorAll('.fade').forEach(el => obs.observe(el));
+}
+</script>
+
+</body></html>
