@@ -309,10 +309,8 @@ def call_llm(text, year, era, provider, api_key, model=None, timeout=90) -> dict
     if not m:
         raise ValueError(f"No JSON in response. Raw: {raw[:400]}")
     kpis = json.loads(m.group(0))
-    return {k: (float(v) if v is not None and v != "null" else None)
-            for k, v in kpis.items()
-            if not isinstance(v, bool)
-            or (v := None) is None}
+    return {k: (float(v) if v is not None and v != "null" and not isinstance(v, bool) else None)
+            for k, v in kpis.items()}
 
 def test_connection(provider, api_key, model=None):
     model = model or DEFAULT_MODELS.get(provider, "sarvam-m")
