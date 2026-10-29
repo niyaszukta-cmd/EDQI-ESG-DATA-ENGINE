@@ -277,7 +277,11 @@ GROQ_MODELS = [
     "mixtral-8x7b-32768",
     "gemma2-9b-it",
 ]
-DEFAULT_MODELS = {"sarvam": "sarvam-m", "groq": "llama-3.3-70b-versatile"}
+SARVAM_MODELS = [
+    "sarvam-105b",
+    "sarvam-105b-conversations",
+]
+DEFAULT_MODELS = {"sarvam": "sarvam-105b", "groq": "llama-3.3-70b-versatile"}
 
 def _headers(provider: str, api_key: str) -> dict:
     if provider == "groq":
@@ -313,7 +317,7 @@ def call_llm(text, year, era, provider, api_key, model=None, timeout=90) -> dict
             for k, v in kpis.items()}
 
 def test_connection(provider, api_key, model=None):
-    model = model or DEFAULT_MODELS.get(provider, "sarvam-m")
+    model = model or DEFAULT_MODELS.get(provider, "sarvam-105b")
     payload = {"model": model, "messages": [{"role": "user", "content": "Reply OK."}], "max_tokens": 5}
     try:
         r = requests.post(
@@ -419,6 +423,7 @@ div[data-testid="metric-container"] {
 
 # Session state
 for k, v in {"docs": [], "results": [], "scored_df": None,
+             "manual_entries": [],
               "cfg": {"provider":"groq","api_key":"","model":DEFAULT_MODELS["groq"],
                       "company":"","bse":"","sector":""}}.items():
     if k not in st.session_state:
@@ -430,7 +435,7 @@ with st.sidebar:
     st.caption("ESG Disclosure Quality Index  \nBRR + BRSR · FY 2012–2025")
     st.divider()
     page = st.radio("Navigation",
-        ["🔧 Configure", "📂 Upload", "⚡ Process", "📈 Results", "📤 Export"],
+        ["🔧 Configure", "📂 Upload", "⚡ Process", "✏️ Manual Entry", "📈 Results", "📤 Export"],
         label_visibility="collapsed")
     st.divider()
     c1, c2 = st.columns(2)
@@ -471,7 +476,7 @@ if page == "🔧 Configure":
         if is_groq:
             model = st.selectbox("Model", GROQ_MODELS)
         else:
-            model = st.text_input("Model", value="sarvam-m")
+            model = st.selectbox("Model", SARVAM_MODELS)
 
     st.divider()
     st.markdown("**Company Details**")
@@ -502,6 +507,7 @@ if page == "🔧 Configure":
     st.session_state.cfg = {"provider": provider_id, "api_key": api_key, "model": model,
                              "company": company, "bse": bse_code, "sector": sector}
     st.info("After entering your key, go to **📂 Upload** to add PDFs, then **⚡ Process**.", icon="ℹ️")
+    st.info("No API key? Use **✏️ Manual Entry** to enter indicator values directly — no API required.", icon="✏️")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -622,7 +628,147 @@ elif page == "⚡ Process":
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE 4 — Results
+# PAGE 4 — Manual Entry (No API)
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "✏️ Manual Entry":
+    st.title("Manual Data Entry")
+    st.caption(
+        "Enter indicator values directly from the annual report — no API key required. "
+        "Add one fiscal year at a time. Results feed into the same EDQI scoring pipeline."
+    )
+    st.divider()
+
+    cfg = st.session_state.cfg
+
+    # ── Company details (shared with Configure) ──────────────────────────────
+    col_a, col_b, col_c = st.columns(3)
+    with col_a:
+        me_company = st.text_input("Company Name", value=cfg.get("company", ""),
+                                   key="me_company", placeholder="e.g. Reliance Industries Ltd")
+    with col_b:
+        me_bse = st.text_input("BSE Code", value=cfg.get("bse", ""),
+                               key="me_bse", placeholder="e.g. 500325")
+    with col_c:
+        me_sector = st.selectbox("Sector (GICS)", [
+            "— Select —", "Energy", "Materials", "Industrials",
+            "Consumer Discretionary", "Consumer Staples", "Health Care",
+            "Financials", "Information Technology",
+            "Communication Services", "Utilities", "Real Estate"],
+            key="me_sector")
+
+    st.divider()
+
+    # ── Fiscal year + ERA ─────────────────────────────────────────────────────
+    col_yr, col_era, _ = st.columns([2, 2, 3])
+    with col_yr:
+        me_year = st.number_input("Fiscal Year", min_value=2010, max_value=2030,
+                                  value=2023, step=1, key="me_year")
+    me_era = get_era(int(me_year))
+    with col_era:
+        st.metric("ERA", f"ERA {me_era} — {'BRSR' if me_era == 2 else 'BRR'}",
+                  help="Auto-detected: FY ≥ 2022 → ERA 2 (BRSR), FY < 2022 → ERA 1 (BRR)")
+
+    ind_list = era_indicators(me_era)
+    pillars  = sorted({i["pillar"] for i in ind_list})
+    p_labels = {"E": "🌿 Environmental", "S": "👥 Social", "G": "🏛 Governance"}
+
+    st.markdown(f"**Enter values for FY{int(me_year)} — {'BRSR (32 KPIs)' if me_era == 2 else 'BRR (25 KPIs)'}**")
+    st.caption("Leave a field blank or 0 if the value is not disclosed. Percentages should be on a 0–100 scale.")
+
+    form_vals: dict[str, float | None] = {}
+
+    for p in pillars:
+        st.markdown(f"##### {p_labels.get(p, p)}")
+        p_inds = [i for i in ind_list if i["pillar"] == p]
+        cols   = st.columns(3)
+        for idx, ind in enumerate(p_inds):
+            with cols[idx % 3]:
+                inv_note = " ↓" if ind["inv"] else ""
+                raw = st.text_input(
+                    f"{ind['id']} · {ind['name']}{inv_note}",
+                    placeholder=f"({ind['unit']})",
+                    key=f"me_{me_year}_{ind['id']}",
+                    help=f"Unit: {ind['unit']}{'  |  Lower is better' if ind['inv'] else ''}"
+                )
+                try:
+                    form_vals[ind["id"]] = float(raw) if raw.strip() else None
+                except ValueError:
+                    form_vals[ind["id"]] = None
+        st.divider()
+
+    col_btn, col_msg = st.columns([2, 5])
+    with col_btn:
+        add_clicked = st.button("➕ Add This Year", type="primary", use_container_width=True)
+
+    if add_clicked:
+        record = {
+            "company":     me_company,
+            "bse_code":    me_bse,
+            "sector":      me_sector if me_sector != "— Select —" else "",
+            "fiscal_year": int(me_year),
+            "era":         me_era,
+            "source_file": f"manual_fy{int(me_year)}",
+        }
+        record.update(form_vals)
+        # Replace if same year already exists
+        st.session_state.manual_entries = [
+            e for e in st.session_state.manual_entries
+            if e.get("fiscal_year") != int(me_year)
+        ]
+        st.session_state.manual_entries.append(record)
+        n_filled = sum(1 for v in form_vals.values() if v is not None)
+        col_msg.success(
+            f"FY{int(me_year)} added — {n_filled}/{len(ind_list)} indicators filled. "
+            f"Total years in queue: {len(st.session_state.manual_entries)}."
+        )
+
+    # ── Queued entries ────────────────────────────────────────────────────────
+    if st.session_state.manual_entries:
+        st.markdown("---")
+        st.markdown("**Years in Queue**")
+        queue_df = pd.DataFrame([{
+            "Fiscal Year": e["fiscal_year"],
+            "ERA":         f"ERA {e['era']} — {'BRSR' if e['era']==2 else 'BRR'}",
+            "Indicators Filled": sum(
+                1 for i in era_indicators(e["era"])
+                if e.get(i["id"]) is not None
+            ),
+            "Total KPIs": len(era_indicators(e["era"])),
+        } for e in sorted(st.session_state.manual_entries, key=lambda x: x["fiscal_year"])])
+        st.dataframe(queue_df.set_index("Fiscal Year"), use_container_width=True)
+
+        col_run, col_clr, col_info = st.columns([2, 2, 4])
+        with col_run:
+            if st.button("⚡ Compute EDQI Scores", type="primary", use_container_width=True):
+                if len(st.session_state.manual_entries) < 2:
+                    col_info.warning(
+                        "EDQI scoring requires at least 2 years within an era for z-normalisation. "
+                        "Add more years."
+                    )
+                else:
+                    st.session_state.results   = st.session_state.manual_entries
+                    st.session_state.scored_df = compute_edqi(st.session_state.manual_entries)
+                    # Sync company info to cfg
+                    st.session_state.cfg["company"] = me_company
+                    st.session_state.cfg["bse"]     = me_bse
+                    st.session_state.cfg["sector"]  = me_sector
+                    col_info.success(
+                        f"EDQI scores computed for {len(st.session_state.manual_entries)} year(s). "
+                        f"Go to **📈 Results** to view."
+                    )
+        with col_clr:
+            if st.button("🗑 Clear Queue", use_container_width=True):
+                st.session_state.manual_entries = []
+                st.rerun()
+    else:
+        st.info(
+            "No years queued yet. Fill in the values above and click **➕ Add This Year**.",
+            icon="✏️"
+        )
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE 5 — Results
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "📈 Results":
     st.title("EDQI Results")
