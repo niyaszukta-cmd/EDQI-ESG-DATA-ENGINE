@@ -310,12 +310,25 @@ def call_llm(text, year, era, provider, api_key, model=None, timeout=90) -> dict
         raise ValueError(f"API {resp.status_code}: {resp.text[:300]}")
     body    = resp.json()
     choices = body.get("choices") or []
-    raw     = (choices[0].get("message", {}).get("content") or "") if choices else ""
+    choice0 = choices[0] if choices else {}
+    msg     = choice0.get("message") or choice0.get("delta") or {}
+    # content may be None/null even if the key exists; also try top-level text
+    raw = (
+        msg.get("content")
+        or msg.get("text")
+        or choice0.get("text")
+        or body.get("content")
+        or ""
+    )
     if not raw:
-        raise ValueError(f"Empty response from API. Full body: {str(body)[:400]}")
+        # Show raw HTTP text so the full structure is visible for diagnosis
+        raise ValueError(
+            f"Empty/null content from API (finish_reason={choice0.get('finish_reason')!r}). "
+            f"Raw response: {resp.text[:800]}"
+        )
     m = re.search(r"\{[\s\S]*\}", raw)
     if not m:
-        raise ValueError(f"No JSON in response. Raw: {raw[:400]}")
+        raise ValueError(f"No JSON in response. Raw: {raw[:600]}")
     kpis = json.loads(m.group(0))
     return {k: (float(v) if v is not None and v != "null" and not isinstance(v, bool) else None)
             for k, v in kpis.items()}
