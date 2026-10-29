@@ -644,12 +644,10 @@ def extract_kpis_local(text: str, era: int) -> dict:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def _z_minmax(values, inv):
+    """Z-normalise then min-max scale to 0–100. Returns None where input is None."""
     valid = [float(v) for v in values if v is not None and not math.isnan(float(v))]
-    if len(valid) == 0:
+    if len(valid) < 2:
         return [None] * len(values)
-    if len(valid) == 1:
-        # Single observation — assign neutral 50 (disclosed but not rankable cross-sectionally)
-        return [50.0 if (v is not None and not math.isnan(float(v))) else None for v in values]
     mu  = sum(valid) / len(valid)
     sig = math.sqrt(sum((v - mu) ** 2 for v in valid) / len(valid)) or 1.0
     z   = [(float(v) - mu) / sig if v is not None else None for v in values]
@@ -663,23 +661,63 @@ def _z_minmax(values, inv):
         out.append(round(max(0.0, min(100.0, 100.0 - sc if inv else sc)), 2))
     return out
 
+
+def _row_val(row, iid):
+    """Return the value for indicator `iid` from a row, handling both 'E1' and 'E1_foo' keys."""
+    col = next((k for k in row if k == iid or k.startswith(iid + "_")), None)
+    return row.get(col) if col else None
+
+
+def _coverage_scores(row, ind_list):
+    """
+    Single-year fallback: pillar score = % of that pillar's indicators disclosed.
+    Disclosed → full credit (100), not found → 0. Average = coverage %.
+    This differentiates pillars meaningfully without cross-sectional ranking.
+    """
+    for p in ("E", "S", "G"):
+        p_inds = [i for i in ind_list if i["pillar"] == p]
+        disclosed = sum(
+            1 for i in p_inds
+            if _row_val(row, i["id"]) is not None
+        )
+        row[f"{p}_score"] = round(disclosed / len(p_inds) * 100, 1) if p_inds else None
+    pv = [row[f"{p}_score"] for p in ("E", "S", "G") if row.get(f"{p}_score") is not None]
+    row["ESG_score"] = round(sum(pv) / len(pv), 1) if pv else None
+    row["scoring_mode"] = "coverage"
+
+
 def _score_group(group, ind_list):
     if not group:
         return group
     rows = [dict(r) for r in group]
-    for ind in ind_list:
-        iid = ind["id"]
-        col = next((k for k in rows[0] if k == iid or k.startswith(iid + "_")), None)
-        raw = [r.get(col) for r in rows] if col else [None] * len(rows)
-        raw = [float(v) if v is not None else None for v in raw]
-        for r, sc in zip(rows, _z_minmax(raw, ind["inv"])):
-            r[f"_s_{iid}"] = sc
+
+    single_year = len(rows) == 1
+
+    if single_year:
+        # ── Single-year: disclosure-coverage scoring ──────────────────────────
+        r = rows[0]
+        _coverage_scores(r, ind_list)
+    else:
+        # ── Multi-year: z-normalise → min-max scale per indicator ─────────────
+        for ind in ind_list:
+            iid = ind["id"]
+            col = next((k for k in rows[0] if k == iid or k.startswith(iid + "_")), None)
+            raw = [r.get(col) for r in rows] if col else [None] * len(rows)
+            raw = [float(v) if v is not None else None for v in raw]
+            for r, sc in zip(rows, _z_minmax(raw, ind["inv"])):
+                r[f"_s_{iid}"] = sc
+        for r in rows:
+            for p in ("E", "S", "G"):
+                pv = [r[f"_s_{i['id']}"] for i in ind_list
+                      if i["pillar"] == p and r.get(f"_s_{i['id']}") is not None]
+                r[f"{p}_score"] = round(sum(pv) / len(pv), 2) if pv else None
+            pv = [r.get(f"{p}_score") for p in ("E", "S", "G")
+                  if r.get(f"{p}_score") is not None]
+            r["ESG_score"]    = round(sum(pv) / len(pv), 2) if pv else None
+            r["scoring_mode"] = "ranked"
+
+    # Coverage % is always computed the same way
     for r in rows:
-        for p in ("E", "S", "G"):
-            pv = [r[f"_s_{i['id']}"] for i in ind_list if i["pillar"] == p and r.get(f"_s_{i['id']}") is not None]
-            r[f"{p}_score"] = round(sum(pv) / len(pv), 2) if pv else None
-        pv = [r.get(f"{p}_score") for p in ("E", "S", "G") if r.get(f"{p}_score") is not None]
-        r["ESG_score"] = round(sum(pv) / len(pv), 2) if pv else None
         filled = sum(
             1 for i in ind_list
             if (c := next((k for k in r if k == i["id"] or k.startswith(i["id"] + "_")), None))
@@ -1120,9 +1158,11 @@ elif page == "📈 Results":
 
     if len(df) == 1:
         st.info(
-            "Single-year analysis — indicator scores are set to **50 (neutral)** "
-            "because z-normalisation requires ≥ 2 years for relative ranking. "
-            "Add more annual reports and re-process to unlock ranked EDQI scores.",
+            "**Single-year mode — Disclosure Coverage Scoring.** "
+            "Each pillar score = % of that pillar's indicators found in the report "
+            "(E: 9–13 indicators, S: 10–14, G: 5–6). "
+            "Upload additional annual reports and re-process to unlock **ranked EDQI scores** "
+            "based on year-over-year performance.",
             icon="ℹ️",
         )
     st.divider()
