@@ -291,7 +291,7 @@ def _headers(provider: str, api_key: str) -> dict:
 def call_llm(text, year, era, provider, api_key, model=None, timeout=90) -> dict:
     if not api_key:
         raise ValueError("API key is required.")
-    model   = model or DEFAULT_MODELS.get(provider, "sarvam-m")
+    model   = model or DEFAULT_MODELS.get(provider, "sarvam-105b")
     prompt  = build_prompt_era2(text, year) if era == 2 else build_prompt_era1(text, year)
     url     = GROQ_URL if provider == "groq" else SARVAM_URL
     payload = {
@@ -308,7 +308,11 @@ def call_llm(text, year, era, provider, api_key, model=None, timeout=90) -> dict
         raise ConnectionError(f"Network error: {e}")
     if not resp.ok:
         raise ValueError(f"API {resp.status_code}: {resp.text[:300]}")
-    raw = resp.json().get("choices", [{}])[0].get("message", {}).get("content", "")
+    body    = resp.json()
+    choices = body.get("choices") or []
+    raw     = (choices[0].get("message", {}).get("content") or "") if choices else ""
+    if not raw:
+        raise ValueError(f"Empty response from API. Full body: {str(body)[:400]}")
     m = re.search(r"\{[\s\S]*\}", raw)
     if not m:
         raise ValueError(f"No JSON in response. Raw: {raw[:400]}")
