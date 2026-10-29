@@ -645,8 +645,11 @@ def extract_kpis_local(text: str, era: int) -> dict:
 
 def _z_minmax(values, inv):
     valid = [float(v) for v in values if v is not None and not math.isnan(float(v))]
-    if len(valid) < 2:
+    if len(valid) == 0:
         return [None] * len(values)
+    if len(valid) == 1:
+        # Single observation — assign neutral 50 (disclosed but not rankable cross-sectionally)
+        return [50.0 if (v is not None and not math.isnan(float(v))) else None for v in values]
     mu  = sum(valid) / len(valid)
     sig = math.sqrt(sum((v - mu) ** 2 for v in valid) / len(valid)) or 1.0
     z   = [(float(v) - mu) / sig if v is not None else None for v in values]
@@ -1113,6 +1116,14 @@ elif page == "📈 Results":
 
     st.markdown(f"### {cfg.get('company') or 'Company'}")
     st.caption(f"FY{df['fiscal_year'].min()} – FY{df['fiscal_year'].max()}  ·  {len(df)} year(s) scored")
+
+    if len(df) == 1:
+        st.info(
+            "Single-year analysis — indicator scores are set to **50 (neutral)** "
+            "because z-normalisation requires ≥ 2 years for relative ranking. "
+            "Add more annual reports and re-process to unlock ranked EDQI scores.",
+            icon="ℹ️",
+        )
     st.divider()
 
     def _fmt(v): return f"{v:.1f}" if v is not None else "—"
