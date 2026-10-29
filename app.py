@@ -922,13 +922,14 @@ elif page == "⚡ Process":
                 full_text  = extract_pdf_text(file_bytes)
                 log(f"   ✓ {len(full_text):,} characters extracted")
 
-                esg_text = find_esg_section(full_text)
-                log(f"   ✓ ESG section: {len(esg_text):,} characters")
-
                 if is_local_mode:
+                    # Local regex mode — search the full document; no token budget to manage
+                    log(f"   ✓ Using full document text ({len(full_text):,} chars) for local extraction")
                     log("   Running local regex extraction (no API)…")
-                    kpis = extract_kpis_local(esg_text, doc["era"])
+                    kpis = extract_kpis_local(full_text, doc["era"])
                 else:
+                    esg_text = find_esg_section(full_text)
+                    log(f"   ✓ ESG section: {len(esg_text):,} characters")
                     log(f"   Calling {cfg['provider'].upper()} API…")
                     kpis = call_llm(esg_text, doc["year"], doc["era"],
                                     cfg["provider"], cfg["api_key"], cfg["model"])
@@ -1176,7 +1177,9 @@ elif page == "📈 Results":
         if panel.empty:
             st.info("No data for this view — no documents from the corresponding era were processed.")
         else:
-            st.dataframe(panel.round(2), use_container_width=True)
+            # Replace None/NaN with "—" for display only
+            display_panel = panel.round(2).astype(object).where(panel.notna(), "—")
+            st.dataframe(display_panel, use_container_width=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
