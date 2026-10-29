@@ -347,6 +347,299 @@ def test_connection(provider, api_key, model=None):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# LOCAL EXTRACTION (NO API)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Each entry: list of regex patterns (tried in order). The FIRST group capture
+# is assumed to be the numeric value. Patterns searched case-insensitively
+# against the ESG section text. Numbers may contain commas (Indian style).
+
+_N = r"([\d,]+\.?\d*)"   # number fragment
+
+INDICATOR_PATTERNS: dict[str, list[str]] = {
+    # ── ERA 1 Environmental ───────────────────────────────────────────────────
+    "E1":  [
+        rf"scope\s*1\s*(?:and|&|\+)?\s*scope?\s*2[^\n]{{0,100}}{_N}",
+        rf"total\s+(?:ghg|greenhouse\s+gas)\s+emiss[^\n]{{0,100}}{_N}",
+        rf"ghg\s+scope\s*1\s*\+\s*2[^\n]{{0,80}}{_N}",
+    ],
+    "E2":  [
+        rf"(?:ghg|emission)\s+intensit[^\n]{{0,120}}{_N}",
+        rf"carbon\s+intensit[^\n]{{0,120}}{_N}",
+    ],
+    "E3":  [
+        rf"total\s+energy\s+consump[^\n]{{0,100}}{_N}",
+        rf"total\s+energy[^\n]{{0,60}}(?:gj|giga\s*joule)[^\n]{{0,60}}{_N}",
+        rf"energy\s+consump[^\n]{{0,100}}{_N}",
+    ],
+    "E4":  [
+        rf"energy\s+intensit[^\n]{{0,120}}{_N}",
+        rf"(?:gj|energy)\s+per\s+(?:revenue|rupee|lakh|crore)[^\n]{{0,80}}{_N}",
+    ],
+    "E5":  [
+        rf"renewable\s+energy[^\n]{{0,100}}{_N}\s*%",
+        rf"{_N}\s*%[^\n]{{0,60}}renewable",
+        rf"renewable[^\n]{{0,120}}{_N}",
+    ],
+    "E6":  [
+        rf"(?:total\s+)?water\s+withdrawal[^\n]{{0,100}}{_N}",
+        rf"water\s+consump[^\n]{{0,100}}{_N}",
+        rf"(?:kl|kilolitre|kiloliter)[^\n]{{0,100}}{_N}",
+    ],
+    "E7":  [
+        rf"water\s+intensit[^\n]{{0,120}}{_N}",
+        rf"(?:kl|water)\s+per\s+(?:revenue|rupee|lakh|crore)[^\n]{{0,80}}{_N}",
+    ],
+    "E8":  [
+        rf"(?:total\s+)?waste\s+generat[^\n]{{0,100}}{_N}",
+        rf"waste[^\n]{{0,60}}(?:mt|metric\s+ton)[^\n]{{0,60}}{_N}",
+    ],
+    "E9":  [
+        rf"waste\s+recycl[^\n]{{0,100}}{_N}\s*%",
+        rf"{_N}\s*%[^\n]{{0,60}}waste\s+recycl",
+        rf"recycl[^\n]{{0,60}}waste[^\n]{{0,80}}{_N}",
+    ],
+    # ── ERA 1 Social ─────────────────────────────────────────────────────────
+    "S1":  [
+        rf"(?:total\s+)?permanent\s+employ[^\n]{{0,100}}{_N}",
+        rf"number\s+of\s+permanent\s+employ[^\n]{{0,100}}{_N}",
+    ],
+    "S2":  [
+        rf"women[^\n]{{0,80}}employ[^\n]{{0,60}}{_N}\s*%",
+        rf"female[^\n]{{0,80}}employ[^\n]{{0,60}}{_N}\s*%",
+        rf"{_N}\s*%[^\n]{{0,60}}women[^\n]{{0,60}}employ",
+    ],
+    "S3":  [
+        rf"training\s+hours?\s+per\s+employ[^\n]{{0,100}}{_N}",
+        rf"average\s+(?:no\.?\s+of\s+)?training\s+hours?[^\n]{{0,100}}{_N}",
+    ],
+    "S4":  [
+        rf"training\s+(?:spend|expenditure|cost)[^\n]{{0,100}}{_N}",
+        rf"amount\s+spent\s+on\s+training[^\n]{{0,100}}{_N}",
+    ],
+    "S5":  [
+        rf"(?:actual\s+)?csr\s+(?:expenditure|amount\s+spent)[^\n]{{0,100}}{_N}",
+        rf"amount\s+spent\s+(?:for|on)\s+csr[^\n]{{0,100}}{_N}",
+    ],
+    "S6":  [
+        rf"csr[^\n]{{0,60}}%\s*(?:of|to)\s*(?:pat|net\s*profit)[^\n]{{0,60}}{_N}",
+        rf"csr\s+spend[^\n]{{0,60}}profit[^\n]{{0,60}}{_N}",
+    ],
+    "S7":  [
+        rf"(?:total\s+)?(?:safety\s+)?(?:lost\s+time\s+)?incidents?[^\n]{{0,80}}{_N}",
+        rf"number\s+of\s+accidents?[^\n]{{0,80}}{_N}",
+    ],
+    "S8":  [
+        rf"ltifr[^\n]{{0,100}}{_N}",
+        rf"lost\s+time\s+injur[^\n]{{0,100}}{_N}",
+    ],
+    "S9":  [
+        rf"employ(?:ee)?\s+grievan[^\n]{{0,100}}{_N}",
+        rf"worker\s+complaint[^\n]{{0,100}}{_N}",
+    ],
+    "S10": [
+        rf"customer\s+complaint[^\n]{{0,100}}{_N}",
+        rf"consumer\s+complaint[^\n]{{0,100}}{_N}",
+    ],
+    # ── ERA 1 Governance ─────────────────────────────────────────────────────
+    "G1":  [
+        rf"board\s+(?:of\s+directors\s+)?meetings?\s+held[^\n]{{0,60}}{_N}",
+        rf"(\d+)\s+board\s+meetings?\s+(?:were\s+)?held",
+    ],
+    "G2":  [
+        rf"independent\s+directors?[^\n]{{0,100}}{_N}\s*%",
+        rf"{_N}\s*%[^\n]{{0,60}}independent\s+directors?",
+    ],
+    "G3":  [
+        rf"women\s+(?:on\s+the\s+)?board[^\n]{{0,100}}{_N}\s*%",
+        rf"female\s+directors?[^\n]{{0,100}}{_N}\s*%",
+        rf"{_N}\s*%[^\n]{{0,60}}women\s+directors?",
+    ],
+    "G4":  [
+        rf"audit\s+committee[^\n]{{0,60}}meetings?\s+held[^\n]{{0,60}}{_N}",
+        rf"(\d+)\s+audit\s+committee\s+meetings?\s+held",
+    ],
+    "G5":  [
+        rf"(?:director|board)\s+attendance[^\n]{{0,100}}{_N}\s*%",
+        rf"{_N}\s*%[^\n]{{0,60}}attendance",
+    ],
+    "G6":  [
+        rf"csr\s+committee[^\n]{{0,60}}meetings?\s+held[^\n]{{0,60}}{_N}",
+        rf"(\d+)\s+csr\s+committee\s+meetings?\s+held",
+    ],
+    # ── ERA 2 Environmental (BRSR) ────────────────────────────────────────────
+    "BE1": [
+        rf"scope\s*1\s+emissions?[^\n]{{0,120}}{_N}",
+        rf"scope\s*i\s+emissions?[^\n]{{0,120}}{_N}",
+        rf"total\s+scope\s*1[^\n]{{0,100}}{_N}",
+    ],
+    "BE2": [
+        rf"scope\s*2\s+emissions?[^\n]{{0,120}}{_N}",
+        rf"scope\s*ii\s+emissions?[^\n]{{0,120}}{_N}",
+        rf"total\s+scope\s*2[^\n]{{0,100}}{_N}",
+    ],
+    "BE3": [
+        rf"(?:ghg|greenhouse\s+gas|emission)\s+intensit[^\n]{{0,120}}{_N}",
+        rf"total\s+(?:scope\s*1\s*\+\s*scope\s*2\s+)?intensit[^\n]{{0,100}}{_N}",
+    ],
+    "BE4": [
+        rf"total\s+energy\s+consump[^\n]{{0,100}}{_N}",
+        rf"energy\s+consump[^\n]{{0,60}}gj[^\n]{{0,60}}{_N}",
+        rf"total\s+energy[^\n]{{0,60}}gj[^\n]{{0,60}}{_N}",
+    ],
+    "BE5": [
+        rf"renewable\s+energy[^\n]{{0,100}}{_N}\s*%",
+        rf"{_N}\s*%[^\n]{{0,60}}renewable",
+        rf"renewable[^\n]{{0,120}}{_N}",
+    ],
+    "BE6": [
+        rf"energy\s+intensit[^\n]{{0,120}}{_N}",
+        rf"energy\s+per\s+(?:revenue|rupee|crore|lakh)[^\n]{{0,100}}{_N}",
+    ],
+    "BE7": [
+        rf"(?:total\s+)?water\s+withdrawal[^\n]{{0,100}}{_N}",
+        rf"water\s+consump[^\n]{{0,100}}{_N}",
+    ],
+    "BE8": [
+        rf"water\s+intensit[^\n]{{0,120}}{_N}",
+        rf"water\s+per\s+(?:revenue|rupee|crore|lakh)[^\n]{{0,100}}{_N}",
+    ],
+    "BE9": [
+        rf"water\s+recycl[^\n]{{0,100}}{_N}\s*%",
+        rf"{_N}\s*%[^\n]{{0,60}}water\s+recycl",
+    ],
+    "BE10": [
+        rf"total\s+waste\s+generat[^\n]{{0,100}}{_N}",
+        rf"waste\s+(?:discharged|generated)[^\n]{{0,60}}(?:mt|metric\s+ton)[^\n]{{0,60}}{_N}",
+    ],
+    "BE11": [
+        rf"hazardous\s+waste[^\n]{{0,100}}{_N}\s*%",
+        rf"{_N}\s*%[^\n]{{0,60}}hazardous",
+    ],
+    "BE12": [
+        rf"waste\s+recycl[^\n]{{0,100}}{_N}\s*%",
+        rf"{_N}\s*%[^\n]{{0,60}}waste\s+recycl",
+        rf"recycled\s+(?:or\s+reused)[^\n]{{0,100}}{_N}\s*%",
+    ],
+    "BE13": [
+        rf"(?:environmental|env)\s+(?:fine|penalt)[^\n]{{0,100}}{_N}",
+        rf"penalt[^\n]{{0,60}}environment[^\n]{{0,100}}{_N}",
+    ],
+    # ── ERA 2 Social (BRSR) ───────────────────────────────────────────────────
+    "BS1": [
+        rf"(?:total\s+)?permanent\s+employ[^\n]{{0,100}}{_N}",
+        rf"permanent\s+workers?[^\n]{{0,100}}{_N}",
+    ],
+    "BS2": [
+        rf"women[^\n]{{0,80}}(?:workforc|employ)[^\n]{{0,60}}{_N}\s*%",
+        rf"{_N}\s*%[^\n]{{0,60}}women[^\n]{{0,60}}(?:workforc|employ)",
+    ],
+    "BS3": [
+        rf"health\s+insuran[^\n]{{0,100}}{_N}\s*%",
+        rf"medical\s+insuran[^\n]{{0,100}}{_N}\s*%",
+    ],
+    "BS4": [
+        rf"provident\s+fund[^\n]{{0,100}}{_N}\s*%",
+        rf"retirement\s+benefit[^\n]{{0,100}}{_N}\s*%",
+        rf"pf[^\n]{{0,60}}coverage[^\n]{{0,60}}{_N}\s*%",
+    ],
+    "BS5": [
+        rf"return\s+to\s+work[^\n]{{0,100}}{_N}\s*%",
+        rf"return\s+to\s+work\s+rate[^\n]{{0,100}}{_N}",
+    ],
+    "BS6": [
+        rf"training\s+hours?\s+per\s+employ[^\n]{{0,100}}{_N}",
+        rf"average\s+training\s+hours?[^\n]{{0,100}}{_N}",
+    ],
+    "BS7": [
+        rf"(?:health\s+(?:and|&)\s+safety|h\s*(?:and|&)\s*s)\s+training[^\n]{{0,100}}{_N}\s*%",
+        rf"safety\s+training[^\n]{{0,100}}{_N}\s*%",
+    ],
+    "BS8": [
+        rf"fatalit[^\n]{{0,100}}(\d+)",
+        rf"(\d+)\s+fatalit",
+    ],
+    "BS9": [
+        rf"ltifr[^\n]{{0,100}}{_N}",
+        rf"lost[\s\-]time\s+injur[^\n]{{0,100}}{_N}",
+    ],
+    "BS10": [
+        rf"posh[^\n]{{0,100}}(\d+)",
+        rf"sexual\s+harass[^\n]{{0,100}}(\d+)",
+        rf"prevention\s+of\s+sexual[^\n]{{0,100}}(\d+)",
+    ],
+    "BS11": [
+        rf"csr\s+(?:expenditure|amount\s+spent)[^\n]{{0,100}}{_N}",
+        rf"amount\s+(?:spent|utilized)\s+(?:on|for)\s+csr[^\n]{{0,100}}{_N}",
+    ],
+    "BS12": [
+        rf"csr[^\n]{{0,60}}%\s*(?:of|to)\s*(?:pat|net\s*profit)[^\n]{{0,60}}{_N}",
+    ],
+    "BS13": [
+        rf"consumer\s+complaint[^\n]{{0,100}}(\d+)",
+        rf"customer\s+complaint[^\n]{{0,100}}(\d+)",
+    ],
+    "BS14": [
+        rf"complaint[^\n]{{0,60}}resolv[^\n]{{0,100}}{_N}\s*%",
+        rf"{_N}\s*%[^\n]{{0,60}}complaint[^\n]{{0,60}}resolv",
+    ],
+    # ── ERA 2 Governance (BRSR) ───────────────────────────────────────────────
+    "BG1": [
+        rf"independent\s+directors?[^\n]{{0,100}}{_N}\s*%",
+        rf"{_N}\s*%[^\n]{{0,60}}independent\s+directors?",
+    ],
+    "BG2": [
+        rf"women\s+directors?[^\n]{{0,100}}{_N}\s*%",
+        rf"female\s+directors?[^\n]{{0,100}}{_N}\s*%",
+        rf"{_N}\s*%[^\n]{{0,60}}women\s+(?:on\s+(?:the\s+)?)?board",
+    ],
+    "BG3": [
+        rf"governance[^\n]{{0,60}}complaint[^\n]{{0,60}}resolv[^\n]{{0,100}}{_N}\s*%",
+        rf"complaint[^\n]{{0,60}}resolv[^\n]{{0,100}}{_N}\s*%",
+    ],
+    "BG4": [
+        rf"ethics?\s+(?:hotline\s+)?complaint[^\n]{{0,100}}(\d+)",
+        rf"whistle\s*blower[^\n]{{0,100}}(\d+)",
+        rf"anti.?corrupt[^\n]{{0,100}}complaint[^\n]{{0,60}}(\d+)",
+    ],
+    "BG5": [
+        rf"(?:brsr\s+)?principles?\s+(?:report|complian|covered)[^\n]{{0,100}}{_N}\s*%",
+        rf"(?:9|nine)\s+principles?[^\n]{{0,100}}{_N}\s*%",
+    ],
+}
+
+
+def _parse_num(raw: str) -> float | None:
+    """Strip commas, parse float, return None on failure."""
+    try:
+        return float(raw.replace(",", ""))
+    except (ValueError, AttributeError):
+        return None
+
+
+def extract_kpis_local(text: str, era: int) -> dict:
+    """
+    Regex-based KPI extraction — no API required.
+    Returns same dict format as call_llm(): {indicator_id: float | None}
+    """
+    ind_list = era_indicators(era)
+    result   = {ind["id"]: None for ind in ind_list}
+    # Normalise whitespace for cleaner matching
+    norm = re.sub(r"[ \t]+", " ", text)
+
+    for ind in ind_list:
+        patterns = INDICATOR_PATTERNS.get(ind["id"], [])
+        for pat in patterns:
+            m = re.search(pat, norm, re.IGNORECASE)
+            if m:
+                val = _parse_num(m.group(1))
+                if val is not None:
+                    result[ind["id"]] = val
+                    break   # first successful pattern wins
+    return result
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # EDQI SCORING
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -452,7 +745,7 @@ with st.sidebar:
     st.caption("ESG Disclosure Quality Index  \nBRR + BRSR · FY 2012–2025")
     st.divider()
     page = st.radio("Navigation",
-        ["🔧 Configure", "📂 Upload", "⚡ Process", "✏️ Manual Entry", "📈 Results", "📤 Export"],
+        ["🔧 Configure", "📂 Upload", "⚡ Process", "📈 Results", "📤 Export"],
         label_visibility="collapsed")
     st.divider()
     c1, c2 = st.columns(2)
@@ -475,25 +768,37 @@ if page == "🔧 Configure":
 
     col_prov, _ = st.columns([2, 3])
     with col_prov:
-        provider_label = st.selectbox("AI Provider",
-            ["Groq (free tier)", "Sarvam AI"],
-            index=0 if st.session_state.cfg["provider"] == "groq" else 1)
+        _prov_opts   = ["Groq (free tier)", "Sarvam AI", "🔍 Local (No API)"]
+        _prov_saved  = st.session_state.cfg["provider"]
+        _prov_idx    = {"groq": 0, "sarvam": 1, "local": 2}.get(_prov_saved, 0)
+        provider_label = st.selectbox("AI Provider", _prov_opts, index=_prov_idx)
 
     is_groq     = provider_label.startswith("Groq")
-    provider_id = "groq" if is_groq else "sarvam"
+    is_local    = provider_label.startswith("🔍")
+    provider_id = "local" if is_local else ("groq" if is_groq else "sarvam")
 
-    col_key, col_model = st.columns(2)
-    with col_key:
-        api_key = st.text_input(
-            "Groq API Key" if is_groq else "Sarvam AI API Key",
-            type="password",
-            placeholder="gsk_…" if is_groq else "sk-sarvam-…",
-            value=st.session_state.cfg.get("api_key", ""))
-    with col_model:
-        if is_groq:
-            model = st.selectbox("Model", GROQ_MODELS)
-        else:
-            model = st.selectbox("Model", SARVAM_MODELS)
+    if is_local:
+        st.success(
+            "**Local extraction selected.** The engine will scan PDF text with keyword and "
+            "regex patterns — no API key needed. Coverage depends on report formatting; "
+            "LLM mode typically scores higher on unstructured text.",
+            icon="🔍",
+        )
+        api_key = ""
+        model   = "local"
+    else:
+        col_key, col_model = st.columns(2)
+        with col_key:
+            api_key = st.text_input(
+                "Groq API Key" if is_groq else "Sarvam AI API Key",
+                type="password",
+                placeholder="gsk_…" if is_groq else "sk-sarvam-…",
+                value=st.session_state.cfg.get("api_key", ""))
+        with col_model:
+            if is_groq:
+                model = st.selectbox("Model", GROQ_MODELS)
+            else:
+                model = st.selectbox("Model", SARVAM_MODELS)
 
     st.divider()
     st.markdown("**Company Details**")
@@ -511,20 +816,20 @@ if page == "🔧 Configure":
             "Communication Services","Utilities","Real Estate"])
 
     st.divider()
-    col_btn, col_res = st.columns([2, 5])
-    with col_btn:
-        if st.button("Test API Connection", type="secondary"):
-            if not api_key:
-                col_res.warning("Enter an API key first.")
-            else:
-                with st.spinner("Connecting…"):
-                    ok, msg = test_connection(provider_id, api_key, model)
-                (col_res.success if ok else col_res.error)(("✅ " if ok else "❌ ") + msg)
+    if not is_local:
+        col_btn, col_res = st.columns([2, 5])
+        with col_btn:
+            if st.button("Test API Connection", type="secondary"):
+                if not api_key:
+                    col_res.warning("Enter an API key first.")
+                else:
+                    with st.spinner("Connecting…"):
+                        ok, msg = test_connection(provider_id, api_key, model)
+                    (col_res.success if ok else col_res.error)(("✅ " if ok else "❌ ") + msg)
 
     st.session_state.cfg = {"provider": provider_id, "api_key": api_key, "model": model,
                              "company": company, "bse": bse_code, "sector": sector}
-    st.info("After entering your key, go to **📂 Upload** to add PDFs, then **⚡ Process**.", icon="ℹ️")
-    st.info("No API key? Use **✏️ Manual Entry** to enter indicator values directly — no API required.", icon="✏️")
+    st.info("After configuring, go to **📂 Upload** to add PDFs, then **⚡ Process**.", icon="ℹ️")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -578,15 +883,18 @@ elif page == "⚡ Process":
     cfg  = st.session_state.cfg
     docs = st.session_state.docs
 
-    if not cfg.get("api_key"):
-        st.warning("Go to **🔧 Configure** and enter your API key first."); st.stop()
+    is_local_mode = cfg.get("provider") == "local"
+
+    if not is_local_mode and not cfg.get("api_key"):
+        st.warning("Go to **🔧 Configure** and enter your API key, or select **Local (No API)** mode."); st.stop()
     if not docs:
         st.warning("Go to **📂 Upload** and add PDF files first."); st.stop()
 
+    _mode_label = "🔍 Local regex extraction (No API)" if is_local_mode else f"`{cfg['provider'].upper()}`  ·  Model: `{cfg['model']}`"
     col_l, col_r = st.columns([3, 2])
     col_l.markdown(f"**{len(docs)} document(s) queued**  \n"
                    f"Company: `{cfg.get('company') or '—'}`  \n"
-                   f"Provider: `{cfg['provider'].upper()}`  ·  Model: `{cfg['model']}`")
+                   f"Mode: {_mode_label}")
     col_r.metric("BRR docs (ERA 1)", sum(1 for d in docs if d["era"] == 1))
     col_r.metric("BRSR docs (ERA 2)", sum(1 for d in docs if d["era"] == 2))
     st.divider()
@@ -614,9 +922,13 @@ elif page == "⚡ Process":
                 esg_text = find_esg_section(full_text)
                 log(f"   ✓ ESG section: {len(esg_text):,} characters")
 
-                log(f"   Calling {cfg['provider'].upper()} API…")
-                kpis = call_llm(esg_text, doc["year"], doc["era"],
-                                cfg["provider"], cfg["api_key"], cfg["model"])
+                if is_local_mode:
+                    log("   Running local regex extraction (no API)…")
+                    kpis = extract_kpis_local(esg_text, doc["era"])
+                else:
+                    log(f"   Calling {cfg['provider'].upper()} API…")
+                    kpis = call_llm(esg_text, doc["year"], doc["era"],
+                                    cfg["provider"], cfg["api_key"], cfg["model"])
 
                 record = {"company": cfg.get("company",""), "bse_code": cfg.get("bse",""),
                           "sector": cfg.get("sector",""), "fiscal_year": doc["year"],
@@ -645,9 +957,9 @@ elif page == "⚡ Process":
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE 4 — Manual Entry (No API)
+# (Manual Entry removed — use Local (No API) mode in Configure instead)
 # ══════════════════════════════════════════════════════════════════════════════
-elif page == "✏️ Manual Entry":
+if False and page == "✏️ Manual Entry":  # kept for reference, not reachable
     st.title("Manual Data Entry")
     st.caption(
         "Enter indicator values directly from the annual report — no API key required. "
@@ -785,7 +1097,7 @@ elif page == "✏️ Manual Entry":
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE 5 — Results
+# PAGE 4 — Results
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "📈 Results":
     st.title("EDQI Results")
